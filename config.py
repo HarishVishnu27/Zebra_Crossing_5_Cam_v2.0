@@ -304,7 +304,7 @@ class AppConfig:
                 torch.backends.cudnn.benchmark = True
                 torch.backends.cudnn.deterministic = False
                 gpu_name = torch.cuda.get_device_name(0)
-                gpu_mem = torch.cuda.get_device_properties(0).total_mem / (1024**3)
+                gpu_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
                 logger.info("[GPU] Device: %s", gpu_name)
                 logger.info("[GPU] Memory: %.1f GB", gpu_mem)
                 logger.info("[GPU] cuDNN benchmark mode: enabled")
@@ -319,6 +319,8 @@ class AppConfig:
                 logger.info("[GPU] No CUDA GPU available, running on CPU")
         except ImportError:
             logger.warning("[GPU] PyTorch not installed, GPU features disabled")
+        except Exception:
+            logger.exception("[GPU] Error configuring GPU, GPU features disabled")
 
 
 # Global config instance

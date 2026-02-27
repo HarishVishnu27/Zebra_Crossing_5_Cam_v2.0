@@ -287,13 +287,16 @@ def system_info():
                 'available': True,
                 'name': torch.cuda.get_device_name(0),
                 'memory_gb': round(
-                    torch.cuda.get_device_properties(0).total_mem / (1024 ** 3), 2
+                    torch.cuda.get_device_properties(0).total_memory / (1024 ** 3), 2
                 ),
             }
         else:
             info['gpu'] = {'available': False}
     except ImportError:
         info['gpu'] = {'available': False, 'note': 'PyTorch not installed'}
+    except Exception:
+        logger.exception("[ROUTES] Error querying GPU info")
+        info['gpu'] = {'available': False, 'note': 'Error querying GPU'}
     return jsonify(info)
 
 
