@@ -107,6 +107,7 @@ def zebra_crossing_analytics():
 # ---------------------------------------------------------------------------
 
 @app.route('/get_last_processed/<cam_id>')
+@login_required
 def get_last_processed(cam_id):
     logger.debug("[ROUTES] /get_last_processed/%s", cam_id)
     filename = database.get_last_processed(cam_id)
@@ -117,6 +118,7 @@ def get_last_processed(cam_id):
 
 
 @app.route('/get_frame/<cam_id>')
+@login_required
 def get_frame(cam_id):
     logger.debug("[ROUTES] /get_frame/%s", cam_id)
     try:
@@ -146,6 +148,7 @@ def get_frame(cam_id):
 # ---------------------------------------------------------------------------
 
 @app.route('/get_regions')
+@login_required
 def get_regions():
     logger.debug("[ROUTES] /get_regions")
     try:
@@ -169,6 +172,7 @@ def get_regions():
 
 
 @app.route('/update_regions', methods=['POST'])
+@login_required
 def update_regions():
     logger.debug("[ROUTES] /update_regions")
     try:
@@ -187,6 +191,7 @@ def update_regions():
 # ---------------------------------------------------------------------------
 
 @app.route('/toggle_sahi', methods=['POST'])
+@login_required
 def toggle_sahi():
     logger.debug("[ROUTES] /toggle_sahi")
     try:
@@ -206,6 +211,7 @@ def toggle_sahi():
 # ---------------------------------------------------------------------------
 
 @app.route('/api/analytics_data')
+@login_required
 def analytics_data():
     logger.debug("[ROUTES] /api/analytics_data")
     cam_id = request.args.get('cam_id')
@@ -224,6 +230,7 @@ def analytics_data():
 
 
 @app.route('/download_zebra_data')
+@login_required
 def download_zebra_data():
     logger.debug("[ROUTES] /download_zebra_data")
     cam_id = request.args.get('cam_id')
@@ -250,6 +257,7 @@ def download_zebra_data():
 # ---------------------------------------------------------------------------
 
 @app.route('/api/system_info')
+@login_required
 def system_info():
     logger.debug("[ROUTES] /api/system_info")
     info = {
