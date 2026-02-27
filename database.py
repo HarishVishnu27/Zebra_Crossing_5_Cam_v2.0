@@ -1,561 +1,386 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Zebra Crossing Vehicle Analytics</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        body {
-            background-color: #f3f4f6;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .camera-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1.5rem;
-        }
-        .camera-container {
-            position: relative;
-            background-color: #1f2937;
-            border-radius: 1rem;
-            overflow: hidden;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            height: 100%;
-        }
-        .camera-container:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-        .camera-feed {
-            position: relative;
-            background-color: black;
-            width: 100%;
-            height: 320px;
-            overflow: hidden;
-        }
-        .camera-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            padding: 0.5rem 1rem;
-            background: linear-gradient(90deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
-            color: white;
-            border-radius: 0 0 1rem 0;
-            font-size: 0.9rem;
-            font-weight: bold;
-            z-index: 10;
-            width: 50%;
-        }
-        .timestamp {
-            position: absolute;
-            bottom: 0.5rem;
-            right: 0.5rem;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.8rem;
-            z-index: 10;
-        }
-        .zebra-indicator {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            background: linear-gradient(135deg, rgba(37, 99, 235, 0.9), rgba(79, 70, 229, 0.9));
-            color: white;
-            padding: 0.5rem;
-            border-radius: 0.5rem;
-            font-size: 0.8rem;
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(4px);
-        }
-        .zebra-indicator i {
-            margin-right: 0.25rem;
-        }
-        .stats-card {
-            border-radius: 1rem;
-            overflow: hidden;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            background: linear-gradient(135deg, #4f46e5 0%, #7e22ce 100%);
-            color: white;
-        }
-        .stats-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
-        }
-        .vehicle-type-tag {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 0.25rem;
-            margin-right: 0.5rem;
-            margin-bottom: 0.5rem;
-            font-size: 0.8rem;
-            backdrop-filter: blur(4px);
-            transition: all 0.2s ease;
-        }
-        .vehicle-type-tag:hover {
-            background-color: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
-        .loading-spinner {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 50px;
-            height: 50px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top: 3px solid #fff;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-        .pulse-dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            background-color: #10B981;
-            border-radius: 50%;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0% { transform: scale(0.8); opacity: 0.7; }
-            50% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(0.8); opacity: 0.7; }
-        }
-        .nav-link {
-            position: relative;
-            transition: all 0.3s ease;
-        }
-        .nav-link::after {
-            content: '';
-            position: absolute;
-            bottom: -4px;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background-color: #fff;
-            transition: width 0.3s ease;
-        }
-        .nav-link:hover::after {
-            width: 100%;
-        }
-        .date-time-display {
-            background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-            backdrop-filter: blur(5px);
-            border-radius: 0.5rem;
-            padding: 0.5rem 1rem;
-            border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .camera-status {
-            transition: all 0.5s ease;
-        }
-        .camera-stats-summary {
-            background: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
-            border-radius: 0.75rem;
-            padding: 0.75rem;
-            border: 1px solid rgba(79, 70, 229, 0.2);
-        }
-        .header-backdrop {
-            backdrop-filter: blur(10px);
-            background: rgba(31, 41, 55, 0.95);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-        }
-        .announcement-banner {
-            background: linear-gradient(90deg, #f472b6 0%, #db2777 100%);
-            color: white;
-            text-align: center;
-            padding: 0.75rem;
-            font-weight: 500;
-        }
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 30px;
-        }
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 34px;
-        }
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 22px;
-            width: 22px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        input:checked + .toggle-slider {
-            background-color: #4f46e5;
-        }
-        input:checked + .toggle-slider:before {
-            transform: translateX(30px);
-        }
-    </style>
-</head>
-<body>
-    <div class="announcement-banner">
-        <div class="container mx-auto px-4">
-            <p>
-                <i class="fas fa-info-circle mr-2"></i>
-                Current Date: <span id="banner-date"></span> | Welcome back, <strong>HarishVishnu27</strong>!
-            </p>
-        </div>
-    </div>
+"""
+Database module for Zebra Crossing Vehicle Analytics v2.
+SQLite-based storage with thread-safe operations and IST timestamps.
+Supports dynamic camera count from config.
+"""
 
-    <header class="header-backdrop text-white p-4 sticky top-0 z-50">
-        <div class="container mx-auto flex justify-between items-center">
-            <div class="flex items-center">
-                <div class="mr-3">
-                    <i class="fas fa-traffic-light text-2xl text-blue-400"></i>
-                </div>
-                <div>
-                    <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Zebra Crossing Analytics</h1>
-                    <div class="flex items-center mt-1 text-sm text-gray-300">
-                        <span class="pulse-dot mr-2"></span>
-                        <span>Live monitoring system</span>
-                        <span class="mx-2">•</span>
-                        <span id="current-time" class="date-time-display">{{ timestamp }} IST</span>
-                    </div>
-                </div>
-            </div>
-            <nav class="hidden md:flex space-x-6 items-center">
-                <a href="{{ url_for('index') }}" class="nav-link text-white hover:text-gray-300 flex items-center">
-                    <i class="fas fa-home mr-1"></i> Home
-                </a>
-                <a href="{{ url_for('admin_panel') }}" class="nav-link text-white hover:text-gray-300 flex items-center">
-                    <i class="fas fa-cog mr-1"></i> Admin Panel
-                </a>
-                <a href="{{ url_for('zebra_crossing_analytics') }}" class="nav-link text-white hover:text-gray-300 flex items-center">
-                    <i class="fas fa-chart-bar mr-1"></i> Analytics
-                </a>
-                <a href="{{ url_for('logout') }}" class="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-bold py-2 px-4 rounded-lg flex items-center tran[...]
-                    <i class="fas fa-sign-out-alt mr-1"></i> Logout
-                </a>
-            </nav>
-            <div class="md:hidden">
-                <button id="mobile-menu-button" class="text-white">
-                    <i class="fas fa-bars text-xl"></i>
-                </button>
-            </div>
-        </div>
-        <div id="mobile-menu" class="hidden md:hidden mt-4 pt-4 border-t border-gray-700">
-            <nav class="flex flex-col space-y-3">
-                <a href="{{ url_for('index') }}" class="text-white hover:text-gray-300 flex items-center">
-                    <i class="fas fa-home mr-1"></i> Home
-                </a>
-                <a href="{{ url_for('admin_panel') }}" class="text-white hover:text-gray-300 flex items-center">
-                    <i class="fas fa-cog mr-1"></i> Admin Panel
-                </a>
-                <a href="{{ url_for('zebra_crossing_analytics') }}" class="text-white hover:text-gray-300 flex items-center">
-                    <i class="fas fa-chart-bar mr-1"></i> Analytics
-                </a>
-                <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded text-center">
-                    <i class="fas fa-sign-out-alt mr-1"></i> Logout
-                </a>
-            </nav>
-        </div>
-    </header>
+import os
+import io
+import csv
+import json
+import sqlite3
+import logging
+import threading
+from datetime import datetime, timedelta, timezone
 
-    <main class="container mx-auto py-6 px-4 md:px-0">
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <div class="flex flex-wrap items-center justify-between">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4 md:mb-0">
-                    <i class="fas fa-tachometer-alt mr-2 text-indigo-600"></i>
-                    System Dashboard
-                </h2>
-                <div class="flex items-center space-x-4">
-                    <div class="flex items-center">
-                        <span class="text-sm text-gray-600 mr-2">SAHI Processing:</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="sahi-toggle" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    <button id="refresh-all" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg flex items-center">
-                        <i class="fas fa-sync-alt mr-2"></i>
-                        Refresh All
-                    </button>
-                </div>
-            </div>
-        </div>
+from config import config
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            {% for cam_id in range(1, 6) %}
-            <div class="stats-card">
-                <div class="p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold flex items-center">
-                            <i class="fas fa-video mr-2"></i>
-                            Camera {{ cam_id }}
-                        </h3>
-                        <div class="bg-white bg-opacity-20 p-2 rounded-full">
-                            <i class="fas fa-car-side text-xl"></i>
-                        </div>
-                    </div>
+logger = logging.getLogger(__name__)
 
-                    <div class="text-3xl font-bold mb-2">
-                        {{ camera_stats['cam' ~ cam_id]['total_count'] if camera_stats['cam' ~ cam_id]['total_count'] else 0 }}
-                    </div>
-                    <div class="text-sm opacity-75 mb-4">Vehicles detected today (since midnight IST)</div>
+IST = timezone(timedelta(hours=5, minutes=30))
 
-                    <div class="mb-4">
-                        <div class="text-sm mb-1">Last detection:</div>
-                        <div class="font-medium">
-                            {{ camera_stats['cam' ~ cam_id]['latest_detection'] if camera_stats['cam' ~ cam_id]['latest_detection'] else 'No data yet' }}
-                        </div>
-                    </div>
+_db_lock = threading.Lock()
 
-                    <div class="flex flex-wrap">
-                        {% for vehicle_type, count in camera_stats['cam' ~ cam_id]['vehicle_counts'].items() %}
-                        <div class="vehicle-type-tag">
-                            <i class="
-                                {% if vehicle_type == 'car' %}fas fa-car
-                                {% elif vehicle_type == 'truck' %}fas fa-truck
-                                {% elif vehicle_type == 'bus' %}fas fa-bus
-                                {% elif vehicle_type == 'motorcycle' %}fas fa-motorcycle
-                                {% elif vehicle_type == 'bicycle' %}fas fa-bicycle
-                                {% else %}fas fa-car-side
-                                {% endif %}
-                                mr-1"></i>
-                            {{ vehicle_type }}: {{ count }}
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
 
-        <div class="camera-grid">
-            {% for cam_id in range(1, 6) %}
-            <div class="camera-container">
-                <div class="p-4 bg-gray-800 text-white flex justify-between items-center">
-                    <h2 class="text-lg font-bold flex items-center">
-                        <i class="fas fa-video mr-2"></i>
-                        Camera {{ cam_id }}
-                    </h2>
-                    <div class="flex items-center">
-                        <span id="status-cam{{ cam_id }}" class="camera-status inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                        <span class="text-sm">Live</span>
-                    </div>
-                </div>
-                <div class="camera-feed" id="cam{{ cam_id }}-container">
-                    <div class="loading-spinner" id="loader-cam{{ cam_id }}"></div>
-                    {% if latest_images['cam' ~ cam_id] %}
-                        <img src="{{ url_for('static', filename='processed/cam' ~ cam_id ~ '/' ~ latest_images['cam' ~ cam_id]) }}"
-                             alt="Camera {{ cam_id }}"
-                             id="cam{{ cam_id }}-feed"
-                             class="w-full h-full object-cover">
-                    {% else %}
-                        <div class="flex items-center justify-center h-full">
-                            <p class="text-gray-500">No image available</p>
-                        </div>
-                    {% endif %}
-                    <div class="zebra-indicator">
-                        <i class="fas fa-road"></i>
-                        <span>Zebra Crossing Monitor</span>
-                    </div>
-                    <div class="timestamp" id="timestamp-cam{{ cam_id }}">
-                        Updating...
-                    </div>
-                </div>
-                <div class="p-4 bg-gray-800 text-white">
-                    <div class="camera-stats-summary">
-                        <div class="flex justify-between mb-1">
-                            <span class="text-sm">Vehicle count:</span>
-                            <span class="font-medium" id="count-cam{{ cam_id }}">--</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm">Status:</span>
-                            <span class="font-medium" id="status-text-cam{{ cam_id }}">Active</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </main>
+def _now_ist():
+    """Return current datetime in IST."""
+    return datetime.now(IST)
 
-    <footer class="bg-gray-800 text-white py-6 mt-8">
-        <div class="container mx-auto px-4">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="mb-4 md:mb-0">
-                    <p>&copy; 2025 Zebra Crossing Vehicle Analytics. All rights reserved.</p>
-                </div>
-                <div class="flex space-x-4">
-                    <a href="{{ url_for('zebra_crossing_analytics') }}" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg flex items-center">
-                        <i class="fas fa-chart-line mr-2"></i>
-                        View Detailed Analytics
-                    </a>
-                </div>
-            </div>
-        </div>
-    </footer>
 
-    <script>
-        // IST Date in banner
-        function updateBannerDateIST() {
-            const now = new Date();
-            // Convert UTC+5:30
-            now.setMinutes(now.getMinutes() + 330);
-            const dateStr = now.toISOString().split("T")[0];
-            document.getElementById('banner-date').textContent = dateStr;
-        }
-        updateBannerDateIST();
+def _today_midnight_ist():
+    """Return today's midnight in IST as ISO string."""
+    now = _now_ist()
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return midnight.strftime('%Y-%m-%d %H:%M:%S')
 
-        // Show IST time on dashboard
-        setInterval(() => {
-            const now = new Date();
-            now.setMinutes(now.getMinutes() + 330);
-            const y = now.getFullYear();
-            const m = String(now.getMonth() + 1).padStart(2, '0');
-            const d = String(now.getDate()).padStart(2, '0');
-            const h = String(now.getHours()).padStart(2, '0');
-            const min = String(now.getMinutes()).padStart(2, '0');
-            const sec = String(now.getSeconds()).padStart(2, '0');
-            document.getElementById('current-time').textContent = `${y}-${m}-${d} ${h}:${min}:${sec} IST`;
-        }, 1000);
 
-        // Mobile menu toggle
-        document.getElementById('mobile-menu-button').addEventListener('click', function() {
-            const menu = document.getElementById('mobile-menu');
-            menu.classList.toggle('hidden');
-        });
+def _get_conn():
+    """Create a new SQLite connection with WAL mode."""
+    db_path = config.database_path
+    logger.debug("[DB] Opening connection to %s", db_path)
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.row_factory = sqlite3.Row
+    return conn
 
-        // SAHI processing toggle
-        document.getElementById('sahi-toggle').addEventListener('change', function() {
-            const isEnabled = this.checked;
 
-            fetch('/toggle_sahi', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ use_sahi: isEnabled }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Show a toast notification
-                const toast = document.createElement('div');
-                toast.className = 'fixed bottom-4 right-4 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
-                toast.innerHTML = `<p>${data.message}</p>`;
-                document.body.appendChild(toast);
+def init_db():
+    """Create the traffic_data table and indexes if they do not exist."""
+    logger.info("[DB] Initializing database at %s", config.database_path)
+    with _db_lock:
+        conn = _get_conn()
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS traffic_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cam_id TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    vehicle_count INTEGER DEFAULT 0,
+                    density REAL DEFAULT 0.0,
+                    weighted_count INTEGER DEFAULT 0,
+                    weighted_density REAL DEFAULT 0.0,
+                    vdc INTEGER DEFAULT 0,
+                    processing_time REAL DEFAULT 0.0,
+                    vehicle_types TEXT DEFAULT '{}'
+                )
+            """)
+            logger.debug("[DB] Table traffic_data ensured")
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_cam_id
+                ON traffic_data (cam_id)
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_timestamp
+                ON traffic_data (timestamp)
+            """)
+            logger.debug("[DB] Indexes on cam_id and timestamp ensured")
+            conn.commit()
+            logger.info("[DB] Database initialization complete")
+        except Exception:
+            logger.exception("[DB] Error initializing database")
+            raise
+        finally:
+            conn.close()
 
-                // Remove toast after 3 seconds
-                setTimeout(() => {
-                    toast.remove();
-                }, 3000);
-            })
-            .catch(error => console.error('Error:', error));
-        });
 
-        // Function to update camera feeds
-        function updateCameraFeeds() {
-            for (let camId = 1; camId <= 4; camId++) {
-                // Show loading indicator
-                const loader = document.getElementById(`loader-cam${camId}`);
-                loader.style.display = 'block';
+def insert_detection(cam_id, vehicle_count, density, weighted_count,
+                     weighted_density, vdc, processing_time,
+                     vehicle_types=None):
+    """Insert a detection record with the current IST timestamp."""
+    ts = _now_ist().strftime('%Y-%m-%d %H:%M:%S')
+    vt_json = json.dumps(vehicle_types if vehicle_types else {})
+    logger.debug(
+        "[DB] Inserting detection: cam=%s count=%d density=%.2f "
+        "weighted_count=%d weighted_density=%.2f vdc=%d proc=%.3fs types=%s",
+        cam_id, vehicle_count, density, weighted_count, weighted_density,
+        vdc, processing_time, vt_json
+    )
+    with _db_lock:
+        conn = _get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO traffic_data
+                   (cam_id, timestamp, vehicle_count, density,
+                    weighted_count, weighted_density, vdc,
+                    processing_time, vehicle_types)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (cam_id, ts, vehicle_count, density, weighted_count,
+                 weighted_density, vdc, processing_time, vt_json)
+            )
+            conn.commit()
+            logger.debug("[DB] Detection inserted for %s at %s", cam_id, ts)
+        except Exception:
+            logger.exception("[DB] Error inserting detection for %s", cam_id)
+            raise
+        finally:
+            conn.close()
 
-                const statusIndicator = document.getElementById(`status-cam${camId}`);
-                const statusText = document.getElementById(`status-text-cam${camId}`);
 
-                statusIndicator.classList.remove('bg-green-500');
-                statusIndicator.classList.add('bg-yellow-500');
-                statusText.textContent = "Updating...";
+def get_camera_stats_today(cam_id):
+    """Get today's stats for a camera since midnight IST."""
+    midnight = _today_midnight_ist()
+    logger.debug("[DB] Getting today's stats for %s since %s", cam_id, midnight)
+    stats = {
+        'total_count': 0,
+        'latest_detection': None,
+        'vehicle_counts': {}
+    }
+    with _db_lock:
+        conn = _get_conn()
+        try:
+            row = conn.execute(
+                """SELECT COALESCE(SUM(vehicle_count), 0) AS total,
+                          MAX(timestamp) AS latest
+                   FROM traffic_data
+                   WHERE cam_id = ? AND timestamp >= ?""",
+                (cam_id, midnight)
+            ).fetchone()
+            if row:
+                stats['total_count'] = row['total']
+                stats['latest_detection'] = row['latest']
+                logger.debug("[DB] %s today total=%d latest=%s",
+                             cam_id, row['total'], row['latest'])
 
-                fetch(`/get_last_processed/cam${camId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            const imgElement = document.getElementById(`cam${camId}-feed`);
-                            if (imgElement) {
-                                // Add timestamp to prevent cache
-                                imgElement.src = data.image_url + '?t=' + new Date().getTime();
-                                document.getElementById(`timestamp-cam${camId}`).textContent =
-                                    'Updated: ' + new Date().toLocaleTimeString();
+            rows = conn.execute(
+                """SELECT vehicle_types FROM traffic_data
+                   WHERE cam_id = ? AND timestamp >= ?""",
+                (cam_id, midnight)
+            ).fetchall()
+            aggregated = {}
+            for r in rows:
+                try:
+                    vt = json.loads(r['vehicle_types']) if r['vehicle_types'] else {}
+                except (json.JSONDecodeError, TypeError):
+                    vt = {}
+                for k, v in vt.items():
+                    aggregated[k] = aggregated.get(k, 0) + v
+            stats['vehicle_counts'] = aggregated
+            logger.debug("[DB] %s vehicle_counts=%s", cam_id, aggregated)
+        except Exception:
+            logger.exception("[DB] Error getting stats for %s", cam_id)
+        finally:
+            conn.close()
+    return stats
 
-                                // Update status to green
-                                statusIndicator.classList.remove('bg-yellow-500');
-                                statusIndicator.classList.add('bg-green-500');
-                                statusText.textContent = "Active";
 
-                                // Extract vehicle count from image name or metadata if available
-                                const countElement = document.getElementById(`count-cam${camId}`);
-                                // This is a placeholder - in a real implementation, you'd parse the count from the API response
-                                countElement.textContent = Math.floor(Math.random() * 10); // Just for demo
-                            }
+def get_last_processed(cam_id):
+    """Get the most recent processed image filename for a camera."""
+    cam_dir = os.path.join(config.processed_folder, cam_id)
+    logger.debug("[DB] Looking for last processed image in %s", cam_dir)
+    if not os.path.isdir(cam_dir):
+        logger.debug("[DB] Directory does not exist: %s", cam_dir)
+        return None
+    files = [f for f in os.listdir(cam_dir)
+             if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    if not files:
+        logger.debug("[DB] No processed images found for %s", cam_id)
+        return None
+    files.sort(reverse=True)
+    logger.debug("[DB] Last processed for %s: %s", cam_id, files[0])
+    return files[0]
 
-                            // Hide loader
-                            loader.style.display = 'none';
-                        } else {
-                            statusIndicator.classList.remove('bg-yellow-500');
-                            statusIndicator.classList.add('bg-red-500');
-                            statusText.textContent = "Error";
 
-                            // Hide loader
-                            loader.style.display = 'none';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching camera feed:', error);
-                        statusIndicator.classList.remove('bg-yellow-500');
-                        statusIndicator.classList.add('bg-red-500');
-                        statusText.textContent = "Error";
+def _resolve_date_range(preset, start_date=None, end_date=None):
+    """Resolve a preset or custom date range to (start, end) ISO strings."""
+    now = _now_ist()
+    if preset == 'today':
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    elif preset == 'yesterday':
+        yesterday = now - timedelta(days=1)
+        start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = yesterday.replace(hour=23, minute=59, second=59, microsecond=0)
+    elif preset == 'last24':
+        start = now - timedelta(hours=24)
+        end = now
+    elif preset == 'lastweek':
+        start = now - timedelta(days=7)
+        end = now
+    elif preset == 'lastmonth':
+        start = now - timedelta(days=30)
+        end = now
+    elif preset == 'custom' and start_date and end_date:
+        start = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=IST)
+        end = datetime.strptime(end_date, '%Y-%m-%d').replace(
+            hour=23, minute=59, second=59, tzinfo=IST)
+    else:
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    s = start.strftime('%Y-%m-%d %H:%M:%S')
+    e = end.strftime('%Y-%m-%d %H:%M:%S')
+    logger.debug("[DB] Date range resolved: %s -> %s (preset=%s)", s, e, preset)
+    return s, e
 
-                        // Hide loader
-                        loader.style.display = 'none';
-                    });
-            }
-        }
 
-        // Initial update
-        updateCameraFeeds();
+def get_analytics_data(cam_id=None, preset='today', start_date=None,
+                       end_date=None, vehicle_type=None):
+    """Flexible analytics query with preset date ranges.
 
-        // Update camera feeds every 5 seconds
-        setInterval(updateCameraFeeds, 5000);
+    If cam_id is 'consolidated', aggregate across all cameras.
+    """
+    start, end = _resolve_date_range(preset, start_date, end_date)
+    consolidated = (cam_id == 'consolidated')
+    logger.debug(
+        "[DB] Analytics query: cam=%s preset=%s range=%s..%s vehicle_type=%s",
+        cam_id, preset, start, end, vehicle_type
+    )
+    result = {
+        'total_count': 0,
+        'vehicle_counts': {},
+        'since': start,
+        'data': []
+    }
+    with _db_lock:
+        conn = _get_conn()
+        try:
+            if consolidated or cam_id is None:
+                query = """SELECT * FROM traffic_data
+                           WHERE timestamp >= ? AND timestamp <= ?
+                           ORDER BY timestamp DESC"""
+                params = (start, end)
+            else:
+                query = """SELECT * FROM traffic_data
+                           WHERE cam_id = ? AND timestamp >= ? AND timestamp <= ?
+                           ORDER BY timestamp DESC"""
+                params = (cam_id, start, end)
+            rows = conn.execute(query, params).fetchall()
 
-        // Refresh all button
-        document.getElementById('refresh-all').addEventListener('click', function() {
-            // Add spinning animation to the icon
-            const icon = this.querySelector('i');
-            icon.classList.add('fa-spin');
+            total = 0
+            aggregated_vt = {}
+            data_rows = []
+            for r in rows:
+                try:
+                    vt = json.loads(r['vehicle_types']) if r['vehicle_types'] else {}
+                except (json.JSONDecodeError, TypeError):
+                    vt = {}
 
-            // Update all camera feeds
-            updateCameraFeeds();
+                # Filter by vehicle_type if specified
+                if vehicle_type:
+                    if vehicle_type not in vt:
+                        continue
 
-            // Remove spinning animation after 1 second
-            setTimeout(() => {
-                icon.classList.remove('fa-spin');
-            }, 1000);
-        });
-    </script>
-</body>
-</html>
+                total += r['vehicle_count']
+                for k, v in vt.items():
+                    aggregated_vt[k] = aggregated_vt.get(k, 0) + v
+                data_rows.append(dict(r))
+
+            result['total_count'] = total
+            result['vehicle_counts'] = aggregated_vt
+            result['data'] = data_rows
+            logger.debug(
+                "[DB] Analytics result: total=%d rows=%d vehicle_counts=%s",
+                total, len(data_rows), aggregated_vt
+            )
+        except Exception:
+            logger.exception("[DB] Error in analytics query")
+        finally:
+            conn.close()
+    return result
+
+
+def get_analytics_page_data(start_date=None, end_date=None):
+    """Return per-camera data and aggregates for the analytics page."""
+    if start_date and end_date:
+        preset = 'custom'
+    else:
+        preset = 'today'
+    start, end = _resolve_date_range(preset, start_date, end_date)
+    logger.debug("[DB] Analytics page data: %s -> %s", start, end)
+
+    camera_ids = config.camera_ids
+    logger.debug("[DB] Dynamic camera list: %s", camera_ids)
+
+    page_data = {
+        'cameras': {},
+        'avg_density': 0.0,
+        'peak_count': 0
+    }
+
+    total_density = 0.0
+    density_count = 0
+    peak = 0
+
+    with _db_lock:
+        conn = _get_conn()
+        try:
+            for cid in camera_ids:
+                rows = conn.execute(
+                    """SELECT * FROM traffic_data
+                       WHERE cam_id = ? AND timestamp >= ? AND timestamp <= ?
+                       ORDER BY timestamp DESC""",
+                    (cid, start, end)
+                ).fetchall()
+
+                cam_total = 0
+                cam_vt = {}
+                cam_data = []
+                for r in rows:
+                    cam_total += r['vehicle_count']
+                    total_density += r['density']
+                    density_count += 1
+                    if r['vehicle_count'] > peak:
+                        peak = r['vehicle_count']
+                    try:
+                        vt = json.loads(r['vehicle_types']) if r['vehicle_types'] else {}
+                    except (json.JSONDecodeError, TypeError):
+                        vt = {}
+                    for k, v in vt.items():
+                        cam_vt[k] = cam_vt.get(k, 0) + v
+                    cam_data.append(dict(r))
+
+                page_data['cameras'][cid] = {
+                    'total_count': cam_total,
+                    'vehicle_counts': cam_vt,
+                    'data': cam_data
+                }
+                logger.debug("[DB] Page data for %s: total=%d", cid, cam_total)
+
+            page_data['avg_density'] = (
+                round(total_density / density_count, 4) if density_count else 0.0
+            )
+            page_data['peak_count'] = peak
+            logger.debug(
+                "[DB] Page aggregates: avg_density=%.4f peak_count=%d",
+                page_data['avg_density'], peak
+            )
+        except Exception:
+            logger.exception("[DB] Error getting analytics page data")
+        finally:
+            conn.close()
+    return page_data
+
+
+def export_csv(cam_id=None, preset='today', start_date=None, end_date=None,
+               vehicle_type=None):
+    """Export analytics data as a CSV string."""
+    logger.debug(
+        "[DB] CSV export: cam=%s preset=%s start=%s end=%s type=%s",
+        cam_id, preset, start_date, end_date, vehicle_type
+    )
+    data = get_analytics_data(
+        cam_id=cam_id, preset=preset, start_date=start_date,
+        end_date=end_date, vehicle_type=vehicle_type
+    )
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        'id', 'cam_id', 'timestamp', 'vehicle_count', 'density',
+        'weighted_count', 'weighted_density', 'vdc',
+        'processing_time', 'vehicle_types'
+    ])
+    for row in data['data']:
+        writer.writerow([
+            row.get('id', ''),
+            row.get('cam_id', ''),
+            row.get('timestamp', ''),
+            row.get('vehicle_count', 0),
+            row.get('density', 0.0),
+            row.get('weighted_count', 0),
+            row.get('weighted_density', 0.0),
+            row.get('vdc', 0),
+            row.get('processing_time', 0.0),
+            row.get('vehicle_types', '{}')
+        ])
+    csv_str = output.getvalue()
+    logger.debug("[DB] CSV export complete: %d data rows", len(data['data']))
+    return csv_str
