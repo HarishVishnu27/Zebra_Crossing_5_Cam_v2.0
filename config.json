@@ -1,0 +1,89 @@
+{
+    "cameras": {
+        "cam1": {
+            "name": "Camera 1",
+            "rtsp_url": "rtsp://192.168.0.51:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
+            "enabled": true
+        },
+        "cam2": {
+            "name": "Camera 2",
+            "rtsp_url": "rtsp://192.168.0.52:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
+            "enabled": true
+        },
+        "cam3": {
+            "name": "Camera 3",
+            "rtsp_url": "rtsp://192.168.0.53:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
+            "enabled": true
+        },
+        "cam4": {
+            "name": "Camera 4",
+            "rtsp_url": "rtsp://192.168.0.54:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
+            "enabled": true
+        },
+        "cam5": {
+            "name": "Camera 5",
+            "rtsp_url": "rtsp://192.168.0.55:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
+            "enabled": true
+        }
+    },
+    "processing": {
+        "frame_skip": 2,
+        "vehicle_threshold": 2,
+        "process_duration": 2,
+        "image_save_interval": 1,
+        "max_queue_size": 32,
+        "use_sahi": true,
+        "device": "auto",
+        "vehicle_classes": ["car", "truck", "bus", "motorcycle", "bicycle"]
+    },
+    "regions": {
+        "cam1": {
+            "Zebra": {
+                "vertices": [[300, 461], [2170, 489]],
+                "weight": 1.0,
+                "color": "blue"
+            }
+        },
+        "cam2": {
+            "Zebra": {
+                "vertices": [[546, 484], [997, 472]],
+                "weight": 1.0,
+                "color": "blue"
+            }
+        },
+        "cam3": {
+            "Zebra": {
+                "vertices": [[436, 523], [992, 535]],
+                "weight": 1.0,
+                "color": "blue"
+            }
+        },
+        "cam4": {
+            "Zebra": {
+                "vertices": [[271, 73], [287, 694]],
+                "weight": 1.0,
+                "color": "blue"
+            }
+        },
+        "cam5": {
+            "Zebra": {
+                "vertices": [[300, 461], [2170, 489]],
+                "weight": 1.0,
+                "color": "blue"
+            }
+        }
+    },
+    "auth": {
+        "username": "admin",
+        "password": "admin@123!"
+    },
+    "server": {
+        "host": "0.0.0.0",
+        "port": 3000,
+        "debug": true
+    },
+    "logging": {
+        "level": "DEBUG",
+        "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    }
+}
