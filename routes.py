@@ -4,6 +4,7 @@ Provides web UI and REST API endpoints with session-based auth.
 """
 
 import os
+import re
 import json
 import logging
 from functools import wraps
@@ -33,6 +34,16 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
+
+
+_CAM_ID_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
+
+
+def _validate_cam_id(cam_id):
+    """Validate cam_id to prevent path traversal attacks."""
+    if not cam_id or not _CAM_ID_RE.match(cam_id):
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +120,8 @@ def zebra_crossing_analytics():
 @app.route('/get_last_processed/<cam_id>')
 @login_required
 def get_last_processed(cam_id):
+    if not _validate_cam_id(cam_id):
+        return jsonify({'status': 'error', 'message': 'Invalid camera ID'}), 400
     logger.debug("[ROUTES] /get_last_processed/%s", cam_id)
     filename = database.get_last_processed(cam_id)
     if filename:
@@ -120,6 +133,8 @@ def get_last_processed(cam_id):
 @app.route('/get_frame/<cam_id>')
 @login_required
 def get_frame(cam_id):
+    if not _validate_cam_id(cam_id):
+        return jsonify({'status': 'error', 'message': 'Invalid camera ID'}), 400
     logger.debug("[ROUTES] /get_frame/%s", cam_id)
     try:
         import cv2
@@ -329,6 +344,8 @@ def upsert_camera():
 @app.route('/api/config/camera/<cam_id>', methods=['DELETE'])
 @login_required
 def delete_camera(cam_id):
+    if not _validate_cam_id(cam_id):
+        return jsonify({'status': 'error', 'message': 'Invalid camera ID'}), 400
     logger.debug("[ROUTES] /api/config/camera/%s DELETE", cam_id)
     try:
         config.remove_camera(cam_id)
