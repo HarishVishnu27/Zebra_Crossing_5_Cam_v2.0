@@ -1,0 +1,74 @@
+{
+  "cameras": [
+    {
+      "id": "cam1",
+      "name": "Entrance 1",
+      "rtsp_url": "rtsp://192.168.0.51:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
+      "enabled": true,
+      "zones": {
+        "zebra": [
+          [300, 461],
+          [2170, 489]
+        ]
+      }
+    },
+    {
+      "id": "cam2",
+      "name": "Entrance 2",
+      "rtsp_url": "rtsp://192.168.0.52:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
+      "enabled": true,
+      "zones": {
+        "zebra": [
+          [546, 484],
+          [997, 472]
+        ]
+      }
+    },
+    {
+      "id": "cam3",
+      "name": "Entrance 3",
+      "rtsp_url": "rtsp://192.168.0.53:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
+      "enabled": true,
+      "zones": {
+        "zebra": [
+          [436, 523],
+          [992, 535]
+        ]
+      }
+    },
+    {
+      "id": "cam4",
+      "name": "Entrance 4",
+      "rtsp_url": "rtsp://192.168.0.54:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
+      "enabled": true,
+      "zones": {
+        "zebra": [
+          [271, 73],
+          [287, 694]
+        ]
+      }
+    },
+    {
+      "id": "cam5",
+      "name": "Entrance 5",
+      "rtsp_url": "rtsp://192.168.0.55:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
+      "enabled": true,
+      "zones": {
+        "zebra": [
+          [300, 461],
+          [2170, 489]
+        ]
+      }
+    }
+  ],
+  "processing": {
+    "frame_skip": 2,
+    "vehicle_threshold": 2,
+    "image_save_interval": 1,
+    "process_duration": 2
+  },
+  "runtime": {
+    "max_queue_size": 32,
+    "use_gpu": true
+  }
+}

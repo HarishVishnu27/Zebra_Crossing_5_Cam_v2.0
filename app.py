@@ -135,11 +135,14 @@
     <script>
         // Configuration and state
         const isDebugMode = true;
-        let currentCamera = 'cam1';
+        // Optional override: define window.ZEBRA_CONFIG_PATH before this script loads
+        const configPath = window.ZEBRA_CONFIG_PATH || 'config_v2.json';
+        const fallbackCameras = ['cam1', 'cam2', 'cam3', 'cam4', 'cam5'];
+        let currentCamera = fallbackCameras[0];
         let points = [];
         let isDrawingEnabled = false;
         let isCanvasReady = false;
-        let stage, layer, backgroundImage;
+        let stage, layer, backgroundImage, cameraSelect;
 
         // Initialize Konva stage
         function initializeCanvas() {
@@ -186,6 +189,50 @@
             };
 
             document.getElementById('debug-info').textContent = JSON.stringify(debugInfo, null, 2);
+        }
+
+        // Load camera list from config so UI adapts without code edits
+        async function loadCameraConfig() {
+            cameraSelect = document.getElementById('camera-select');
+
+            try {
+                const response = await fetch(configPath, { cache: 'no-store' });
+                if (!response.ok) {
+                    throw new Error(`Config fetch failed (${response.status})`);
+                }
+
+                const config = await response.json();
+                const enabledCameras = (config.cameras || []).filter(cam => cam.enabled !== false);
+
+                if (!enabledCameras.length) {
+                    throw new Error('No enabled cameras declared in config');
+                }
+
+                cameraSelect.innerHTML = '';
+                enabledCameras.forEach((cam, index) => {
+                    const option = document.createElement('option');
+                    option.value = cam.id;
+                    option.textContent = cam.name || cam.id || `Camera ${index + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+
+                currentCamera = enabledCameras[0].id;
+                cameraSelect.value = currentCamera;
+                setStatus(`Loaded ${enabledCameras.length} camera(s) from ${configPath}`);
+            } catch (error) {
+                cameraSelect.innerHTML = '';
+                fallbackCameras.forEach((camId, index) => {
+                    const option = document.createElement('option');
+                    option.value = camId;
+                    option.textContent = `Camera ${index + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+                currentCamera = fallbackCameras[0];
+                cameraSelect.value = currentCamera;
+                setStatus(`Using fallback cameras (${fallbackCameras.length} available). ${error.message}`, true);
+            } finally {
+                updateDebugInfo();
+            }
         }
 
         // Load camera frame
@@ -351,6 +398,7 @@
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
+            loadCameraConfig();
             initializeCanvas();
             updateDebugInfo();
 
@@ -396,7 +444,12 @@
 
             // Load camera button
             document.getElementById('load-camera').addEventListener('click', function() {
-                currentCamera = document.getElementById('camera-select').value;
+                const selectEl = cameraSelect || document.getElementById('camera-select');
+                currentCamera = selectEl ? selectEl.value : currentCamera;
+                if (!currentCamera) {
+                    setStatus(`No cameras available. Ensure at least one camera with "enabled": true is defined in your configuration file (default: ${configPath}).`, true);
+                    return;
+                }
                 loadCameraFrame(currentCamera)
                     .then(() => loadExistingRegions())
                     .catch(error => {
