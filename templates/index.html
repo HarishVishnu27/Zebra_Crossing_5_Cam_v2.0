@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zebra Crossing Analytics v2 — Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #0f1117;
+            --bg-card: rgba(23, 25, 35, 0.85);
+            --bg-glass: rgba(30, 33, 48, 0.65);
+            --accent-purple: #7c3aed;
+            --accent-pink: #ec4899;
+            --text-primary: #e2e8f0;
+            --text-muted: #94a3b8;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        /* Announcement banner */
+        .announcement-banner {
+            background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple));
+            text-align: center;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #fff;
+        }
+
+        /* Sticky header */
+        .main-header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(15, 17, 23, 0.82);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+            padding: 0.65rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            white-space: nowrap;
+        }
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .live-dot {
+            width: 8px; height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse-dot 1.4s infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,.6); }
+            50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+        }
+        .nav-links { display: flex; gap: 1.25rem; align-items: center; }
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover, .nav-links a.active { color: #fff; }
+        .hamburger { display: none; background: none; border: none; color: #fff; font-size: 1.4rem; cursor: pointer; }
+
+        /* Glassmorphism card */
+        .glass-card {
+            background: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 1rem;
+        }
+
+        /* Dashboard bar */
+        .dashboard-bar {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 0.75rem;
+            padding: 0.85rem 1.25rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin: 1.25rem 1.5rem 0;
+        }
+        .dashboard-bar h2 { font-size: 1.1rem; font-weight: 600; margin: 0; }
+        .badge-count {
+            background: var(--accent-purple);
+            color: #fff;
+            font-size: 0.75rem;
+            padding: 0.15rem 0.55rem;
+            border-radius: 9999px;
+            font-weight: 600;
+        }
+
+        /* Toggle switch */
+        .toggle-wrapper { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+        .toggle-switch { position: relative; width: 42px; height: 22px; cursor: pointer; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; inset: 0;
+            background: #374151;
+            border-radius: 22px;
+            transition: 0.3s;
+        }
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 16px; height: 16px;
+            left: 3px; bottom: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .toggle-switch input:checked + .toggle-slider { background: var(--accent-purple); }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+        /* Buttons */
+        .btn-refresh {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            border: none;
+            color: #fff;
+            padding: 0.45rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+        .btn-refresh:hover { opacity: 0.85; }
+
+        /* Stats grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            padding: 1.25rem 1.5rem 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, rgba(124,58,237,0.35), rgba(236,72,153,0.18));
+            border: 1px solid rgba(124,58,237,0.25);
+            border-radius: 1rem;
+            padding: 1rem 1.15rem;
+        }
+        .stat-card h3 {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin: 0 0 0.5rem;
+        }
+        .stat-card .count {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #c084fc, var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-card .last-detect { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .vehicle-breakdown { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+        .vehicle-chip {
+            font-size: 0.72rem;
+            background: rgba(255,255,255,0.07);
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.35rem;
+            color: var(--text-muted);
+        }
+        .vehicle-chip i { margin-right: 0.2rem; }
+
+        /* Camera grid */
+        .camera-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+            gap: 1.25rem;
+            padding: 1.25rem 1.5rem;
+        }
+        .camera-container {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+        .camera-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .camera-header .cam-title { font-weight: 600; font-size: 0.95rem; }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #facc15;
+            display: inline-block;
+        }
+        .status-dot.online { background: #22c55e; }
+        .status-dot.error { background: #ef4444; }
+        .camera-feed {
+            position: relative;
+            height: 320px;
+            background: #111318;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .camera-feed img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .no-image {
+            color: var(--text-muted);
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        .no-image i { font-size: 2rem; display: block; margin-bottom: 0.5rem; }
+
+        /* Loading spinner */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+        }
+        .loading-overlay.active { display: flex; }
+        .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid rgba(255,255,255,0.15);
+            border-top-color: var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Badges & overlays */
+        .badge-monitor {
+            position: absolute;
+            top: 0.5rem; left: 0.5rem;
+            background: rgba(124,58,237,0.85);
+            color: #fff;
+            font-size: 0.65rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 0.3rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+        }
+        .badge-timestamp {
+            position: absolute;
+            bottom: 0.5rem; right: 0.5rem;
+            background: rgba(0,0,0,0.7);
+            color: #cbd5e1;
+            font-size: 0.68rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.3rem;
+        }
+        .camera-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 1rem;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Footer */
+        .page-footer {
+            text-align: center;
+            padding: 2rem 1.5rem 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+        .btn-analytics {
+            display: inline-block;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            color: #fff;
+            text-decoration: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: opacity 0.2s;
+        }
+        .btn-analytics:hover { opacity: 0.85; }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .nav-links { display: none; flex-direction: column; position: absolute; top: 100%; right: 0; background: rgba(15,17,23,0.96); padding: 1rem 1.5rem; border-radius: 0 0 0.75rem 0.75rem; gap: 0.75rem; }
+            .nav-links.open { display: flex; }
+            .hamburger { display: block; }
+            .camera-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+            .dashboard-bar { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Announcement Banner -->
+    <div class="announcement-banner">
+        <i class="fas fa-bullhorn" style="margin-right:0.4rem;"></i>
+        Welcome to Zebra Crossing Analytics v2 &mdash; <span id="bannerDate"></span>
+    </div>
+
+    <!-- Sticky Header -->
+    <header class="main-header">
+        <div style="display:flex;align-items:center;gap:1.25rem;">
+            <span class="logo-text"><i class="fas fa-road" style="margin-right:0.4rem;"></i>Zebra Crossing Analytics v2</span>
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                <span>LIVE</span>
+                <span id="istClock">--:--:--</span>
+            </div>
+        </div>
+        <button class="hamburger" id="hamburgerBtn" aria-label="Toggle navigation"><i class="fas fa-bars"></i></button>
+        <nav class="nav-links" id="navLinks">
+            <a href="{{ url_for('index') }}" class="active"><i class="fas fa-home"></i> Home</a>
+            <a href="{{ url_for('admin_panel') }}"><i class="fas fa-cogs"></i> Admin Panel</a>
+            <a href="{{ url_for('zebra_crossing_analytics') }}"><i class="fas fa-chart-bar"></i> Analytics</a>
+            <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </nav>
+    </header>
+
+    <!-- System Dashboard Bar -->
+    <div class="dashboard-bar">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <h2><i class="fas fa-tachometer-alt" style="margin-right:0.35rem;"></i>System Dashboard</h2>
+            <span class="badge-count">{{ cameras|length }} Camera{{ 's' if cameras|length != 1 }}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <div class="toggle-wrapper">
+                <span>SAHI Processing</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="sahiToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <button class="btn-refresh" id="refreshAllBtn"><i class="fas fa-sync-alt" style="margin-right:0.3rem;"></i>Refresh All</button>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        {% for cam_id in camera_ids %}
+        <div class="stat-card">
+            <h3><i class="fas fa-video" style="margin-right:0.3rem;"></i>{{ cameras[cam_id].name }}</h3>
+            <div class="count" id="statCount-{{ cam_id }}">{{ camera_stats[cam_id].total_count | default(0) }}</div>
+            <div class="last-detect">
+                <i class="far fa-clock"></i>
+                Last: <span id="statLast-{{ cam_id }}">{{ camera_stats[cam_id].latest_detection | default('No detections') }}</span>
+            </div>
+            <div class="vehicle-breakdown">
+                {% set vc = camera_stats[cam_id].vehicle_counts | default({}) %}
+                <span class="vehicle-chip"><i class="fas fa-car"></i> {{ vc.get('car', 0) }}</span>
+                <span class="vehicle-chip"><i class="fas fa-truck"></i> {{ vc.get('truck', 0) }}</span>
+                <span class="vehicle-chip"><i class="fas fa-bus"></i> {{ vc.get('bus', 0) }}</span>
+                <span class="vehicle-chip"><i class="fas fa-motorcycle"></i> {{ vc.get('motorcycle', 0) }}</span>
+                <span class="vehicle-chip"><i class="fas fa-bicycle"></i> {{ vc.get('bicycle', 0) }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Camera Feed Grid -->
+    <div class="camera-grid">
+        {% for cam_id in camera_ids %}
+        <div class="camera-container" id="container-{{ cam_id }}">
+            <div class="camera-header">
+                <span class="cam-title"><i class="fas fa-video" style="margin-right:0.35rem;color:#a78bfa;"></i>{{ cameras[cam_id].name }}</span>
+                <span class="status-dot" id="status-{{ cam_id }}" title="Status"></span>
+            </div>
+            <div class="camera-feed" id="feed-{{ cam_id }}">
+                <div class="loading-overlay" id="loader-{{ cam_id }}">
+                    <div class="spinner"></div>
+                </div>
+                {% if latest_images[cam_id] %}
+                <img id="img-{{ cam_id }}"
+                     src="{{ url_for('static', filename='processed/' + cam_id + '/' + latest_images[cam_id]) }}"
+                     alt="{{ cameras[cam_id].name }}">
+                {% else %}
+                <div class="no-image" id="placeholder-{{ cam_id }}">
+                    <i class="fas fa-video-slash"></i>
+                    No image available
+                </div>
+                <img id="img-{{ cam_id }}" src="" alt="{{ cameras[cam_id].name }}" style="display:none;">
+                {% endif %}
+                <span class="badge-monitor">Zebra Crossing Monitor</span>
+                <span class="badge-timestamp" id="timestamp-{{ cam_id }}">--</span>
+            </div>
+            <div class="camera-footer">
+                <span><i class="fas fa-car" style="margin-right:0.25rem;"></i>Vehicles: <strong id="footerCount-{{ cam_id }}">{{ camera_stats[cam_id].total_count | default(0) }}</strong></span>
+                <span id="statusText-{{ cam_id }}">Waiting for update…</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="page-footer">
+        <a href="{{ url_for('zebra_crossing_analytics') }}" class="btn-analytics"><i class="fas fa-chart-line" style="margin-right:0.35rem;"></i>View Detailed Analytics</a>
+        <p>&copy; {{ "now" | default("2025") }} Zebra Crossing Vehicle Analytics v2. All rights reserved.</p>
+    </footer>
+
+    <script>
+        /* ── Dynamic camera IDs from Flask ── */
+        const cameraIds = {{ camera_ids | tojson }};
+
+        /* ── IST Clock ── */
+        function updateISTClock() {
+            const now = new Date();
+            const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+            const hh = String(ist.getHours()).padStart(2, '0');
+            const mm = String(ist.getMinutes()).padStart(2, '0');
+            const ss = String(ist.getSeconds()).padStart(2, '0');
+            document.getElementById('istClock').textContent = hh + ':' + mm + ':' + ss + ' IST';
+        }
+        setInterval(updateISTClock, 1000);
+        updateISTClock();
+
+        /* ── Banner date ── */
+        (function() {
+            const d = new Date();
+            const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Kolkata' };
+            document.getElementById('bannerDate').textContent = d.toLocaleDateString('en-IN', opts);
+        })();
+
+        /* ── Mobile menu toggle ── */
+        document.getElementById('hamburgerBtn').addEventListener('click', function() {
+            document.getElementById('navLinks').classList.toggle('open');
+        });
+
+        /* ── SAHI Toggle ── */
+        document.getElementById('sahiToggle').addEventListener('change', function() {
+            fetch('/toggle_sahi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ use_sahi: this.checked })
+            })
+            .then(r => r.json())
+            .then(data => console.log('SAHI:', data.message))
+            .catch(err => console.error('SAHI toggle error:', err));
+        });
+
+        /* ── Update Camera Feeds ── */
+        function updateCameraFeeds() {
+            cameraIds.forEach(function(camId) {
+                const loader = document.getElementById('loader-' + camId);
+                const img = document.getElementById('img-' + camId);
+                const statusDot = document.getElementById('status-' + camId);
+                const statusText = document.getElementById('statusText-' + camId);
+                const timestampEl = document.getElementById('timestamp-' + camId);
+                const placeholder = document.getElementById('placeholder-' + camId);
+
+                if (loader) loader.classList.add('active');
+
+                fetch('/get_last_processed/' + camId)
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (loader) loader.classList.remove('active');
+                        if (data.status === 'success' && data.image_url) {
+                            img.src = data.image_url + '?t=' + Date.now();
+                            img.style.display = '';
+                            if (placeholder) placeholder.style.display = 'none';
+                            statusDot.className = 'status-dot online';
+                            statusText.textContent = 'Live';
+                            const now = new Date();
+                            const ts = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                            timestampEl.textContent = ts;
+                        } else {
+                            statusDot.className = 'status-dot';
+                            statusText.textContent = 'No image';
+                        }
+                    })
+                    .catch(function(err) {
+                        if (loader) loader.classList.remove('active');
+                        statusDot.className = 'status-dot error';
+                        statusText.textContent = 'Error';
+                        console.error('Feed error (' + camId + '):', err);
+                    });
+            });
+        }
+
+        /* ── Auto-refresh every 5 seconds ── */
+        setInterval(updateCameraFeeds, 5000);
+
+        /* ── Refresh All button ── */
+        document.getElementById('refreshAllBtn').addEventListener('click', function() {
+            updateCameraFeeds();
+        });
+
+        /* ── Initial feed update ── */
+        updateCameraFeeds();
+    </script>
+</body>
+</html>
