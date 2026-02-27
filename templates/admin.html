@@ -614,8 +614,8 @@ function initStage() {
         if (points.length >= 2) return;
 
         const pos = stage.getPointerPosition();
-        const scaleX = (bgImage ? bgImage.width() / stage.width() : 1);
-        const scaleY = (bgImage ? bgImage.height() / stage.height() : 1);
+        const scaleX = (bgImage ? bgImage.image().width / stage.width() : 1);
+        const scaleY = (bgImage ? bgImage.image().height / stage.height() : 1);
 
         // Store original-resolution coordinates
         const origX = pos.x * scaleX;
