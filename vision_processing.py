@@ -1,125 +1,270 @@
+"""
+GPU-optimized multi-camera video processing module for Zebra Crossing
+vehicle detection. Designed for NVIDIA Jetson Orin deployment.
+
+Cyclic processing: each enabled camera is processed for config.process_duration
+seconds, then the loop moves to the next camera.
+"""
+
 import os
-import json
+import time
+import logging
+
+import cv2
 import numpy as np
-import torch
-from collections import deque
+from ultralytics import YOLO
 
-# Configuration
-PROCESSED_FOLDER = 'static/processed/'
-DATABASE = 'traffic_multi1.db'
-FRAME_SKIP = 2  # Changed from 8 to 2
-VEHICLE_THRESHOLD = 2
-MAX_QUEUE_SIZE = 32
-PROCESSING_TIMES = {f'cam{i+1}': deque(maxlen=50) for i in range(5)}
-IMAGE_SAVE_INTERVAL = 1  # Save images every IMAGE_SAVE_INTERVAL seconds
-PROCESS_DURATION = 2  # Process each stream for 2 seconds
+from config import config, initialize_environment, COLOR_MAPPING
+import database
 
-# Authentication settings
-DEFAULT_USERNAME = 'admin'
-DEFAULT_PASSWORD = 'admin@123!'
+logger = logging.getLogger(__name__)
 
+# Proximity threshold (pixels) for zebra-line crossing detection
+CROSSING_THRESHOLD = 30
 
-# RTSP URLs for each camera
-RTSP_URLS = {
-    'cam1': "rtsp://192.168.0.51:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
-    'cam2': "rtsp://192.168.0.52:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
-    'cam3': "rtsp://192.168.0.53:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
-    'cam4': "rtsp://192.168.0.54:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true",
-    'cam5': "rtsp://192.168.0.55:554/rtsp/streaming?channel=1&subtype=1&onvif_metadata=true"
-}
+# ---------------------------------------------------------------------------
+# Module-level initialisation
+# ---------------------------------------------------------------------------
+
+regions = initialize_environment()
+USE_SAHI = config.use_sahi
 
 
-# Model configuration
-NUM_BLOCKS = 5
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-NUM_WORKERS = os.cpu_count()  # Use os.cpu_count() instead of mp.cpu_count()
-VEHICLE_CLASSES = ['car', 'truck', 'bus', 'motorcycle', 'bicycle']
+def load_model():
+    """Load YOLOv8 nano model and move it to the configured device."""
+    logger.info("[VISION] Loading YOLOv8n model (device=%s)", config.device)
+    mdl = YOLO('yolov8n.pt')
+    mdl.to(config.device)
+    if config.device == 'cuda':
+        mdl.model.half()  # FP16 for Jetson performance
+        logger.info("[VISION] FP16 half-precision enabled for CUDA")
+    logger.info("[VISION] Model loaded successfully on %s", config.device)
+    return mdl
 
-# Color mappings
-COLOR_MAPPING = {
-    "red": (255, 0, 0),
-    "green": (0, 255, 0),
-    "blue": (0, 0, 255),
-    "yellow": (255, 255, 0),
-    "black": (0, 0, 0),
-    "white": (255, 255, 255),
-}
 
-REGIONS_FILE = 'regions_config.json'
+model = load_model()
 
-# Hardcoded default regions - keep only the zebra crossing configurations
-DEFAULT_REGIONS = {
-    'cam1': {
-        'Zebra': {
-            'vertices': np.array([(300,461), (2170,489)], dtype=np.int32),
-            'weight': 1.0,
-            'color': (0, 0, 255)
-        }
-    },
-    'cam2': {
-        'Zebra': {
-            'vertices': np.array([(546, 484), (997, 472)], dtype=np.int32),
-            'weight': 1.0,
-            'color': (0, 0, 255)
-        }
-    },
-    'cam3': {
-        'Zebra': {
-            'vertices': np.array([(436, 523), (992, 535)], dtype=np.int32),
-            'weight': 1.0,
-            'color': (0, 0, 255)
-        }
-    },
-    'cam4': {
-        'Zebra': {
-            'vertices': np.array([(271, 73), (287, 694)], dtype=np.int32),
-            'weight': 1.0,
-            'color': (0, 0, 255)
-        }
-    },
-    'cam5': {
-        'Zebra': {
-            'vertices': np.array([(300,461), (2170,489)], dtype=np.int32),
-            'weight': 1.0,
-            'color': (0, 0, 255)
-        }
-    }
-}
+# ---------------------------------------------------------------------------
+# Detection helpers
+# ---------------------------------------------------------------------------
 
-# Create necessary directories
-def init_directories():
-    os.makedirs('static/temp/', exist_ok=True)
-    os.makedirs(PROCESSED_FOLDER, exist_ok=True)
-    for cam in RTSP_URLS.keys():
-        os.makedirs(os.path.join(PROCESSED_FOLDER, cam), exist_ok=True)
 
-# Load regions from config file
-def load_regions():
-    regions = DEFAULT_REGIONS.copy()
+def detect_vehicles(frame, cam_id):
+    """Run YOLOv8 inference on *frame* and return filtered detections.
 
-    if os.path.exists(REGIONS_FILE):
-        with open(REGIONS_FILE, 'r') as file:
-            saved_regions = json.load(file)
+    Returns a list of dicts:
+        [{'class': 'car', 'confidence': 0.85, 'bbox': [x1, y1, x2, y2]}, ...]
+    """
+    t0 = time.time()
+    results = model(frame, verbose=False)
+    detections = []
+    for result in results:
+        for box in result.boxes:
+            cls_id = int(box.cls[0])
+            cls_name = model.names[cls_id]
+            if cls_name in config.vehicle_classes:
+                conf = float(box.conf[0])
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                detections.append({
+                    'class': cls_name,
+                    'confidence': conf,
+                    'bbox': [x1, y1, x2, y2],
+                })
+    elapsed = time.time() - t0
+    logger.debug("[VISION] %s: %d vehicles detected in %.3fs",
+                 cam_id, len(detections), elapsed)
+    return detections
 
-        for cam, cam_regions in regions.items():
-            if cam in saved_regions:
-                for r_name, r_data in saved_regions[cam].items():
-                    if r_name == 'Zebra' and 'vertices' in r_data:
-                        r_data['vertices'] = np.array(r_data['vertices'], dtype=np.int32)
-                        regions[cam].update({r_name: r_data})
 
-    return regions
+def check_zebra_crossing(detections, cam_regions, cam_id):
+    """Check if detected vehicles cross the zebra line.
 
-# Configure CUDA settings if available
-def configure_cuda():
-    if torch.cuda.is_available():
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.deterministic = False
+    A vehicle crosses if its bottom-centre y-coordinate is within
+    CROSSING_THRESHOLD pixels of the zebra line.
 
-# Initialize environment
-def initialize_environment():
-    init_directories()
-    configure_cuda()
-    return load_regions()
+    Returns:
+        crossing_count (int), vehicle_type_counts (dict)
+    """
+    crossing_count = 0
+    vehicle_type_counts = {}
 
-REGIONS = initialize_environment()
+    zebra = cam_regions.get('Zebra')
+    if zebra is None:
+        return crossing_count, vehicle_type_counts
+
+    vertices = zebra['vertices']
+    if len(vertices) < 2:
+        return crossing_count, vehicle_type_counts
+
+    # Zebra line y-value: average of endpoint y-coordinates
+    line_y = float(np.mean(vertices[:, 1]))
+
+    for det in detections:
+        x1, y1, x2, y2 = det['bbox']
+        bottom_centre_y = y2
+        if abs(bottom_centre_y - line_y) <= CROSSING_THRESHOLD:
+            crossing_count += 1
+            cls = det['class']
+            vehicle_type_counts[cls] = vehicle_type_counts.get(cls, 0) + 1
+
+    if crossing_count:
+        logger.debug("[VISION] %s: %d vehicles crossing zebra line",
+                     cam_id, crossing_count)
+    return crossing_count, vehicle_type_counts
+
+
+def annotate_frame(frame, detections, cam_regions, cam_id):
+    """Draw bounding boxes, labels, and zebra line on *frame* (in-place)."""
+    # Draw zebra crossing line
+    zebra = cam_regions.get('Zebra')
+    if zebra is not None:
+        verts = zebra['vertices']
+        if len(verts) >= 2:
+            pt1 = tuple(verts[0])
+            pt2 = tuple(verts[-1])
+            cv2.line(frame, pt1, pt2, (255, 0, 0), 2)  # blue in BGR
+
+    # Draw vehicle bounding boxes
+    for det in detections:
+        x1, y1, x2, y2 = [int(v) for v in det['bbox']]
+        label = f"{det['class']} {det['confidence']:.2f}"
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(frame, label, (x1, y1 - 8),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+    # Camera ID overlay
+    cv2.putText(frame, cam_id, (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+    return frame
+
+
+# ---------------------------------------------------------------------------
+# Per-camera processing cycle
+# ---------------------------------------------------------------------------
+
+
+def process_camera_cycle(cam_id, rtsp_url, duration):
+    """Open *rtsp_url*, process frames for *duration* seconds, then release."""
+    global regions
+
+    logger.info("[VISION] Starting cycle for %s (duration=%ds)", cam_id, duration)
+
+    cam_regions = regions.get(cam_id, {})
+    save_dir = os.path.join(config.processed_folder, cam_id)
+    os.makedirs(save_dir, exist_ok=True)
+
+    # Open RTSP stream with TCP transport
+    cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    if not cap.isOpened():
+        logger.warning("[VISION] %s: cannot open stream %s", cam_id, rtsp_url)
+        return
+
+    frame_count = 0
+    total_vehicle_count = 0
+    total_crossing_count = 0
+    aggregated_types = {}
+    cycle_start = time.time()
+    last_save_time = cycle_start
+    processing_time_sum = 0.0
+
+    try:
+        while time.time() - cycle_start < duration:
+            ret, frame = cap.read()
+            if not ret:
+                logger.warning("[VISION] %s: frame read failed, ending cycle",
+                               cam_id)
+                break
+
+            frame_count += 1
+            if frame_count % config.frame_skip != 0:
+                continue
+
+            t0 = time.time()
+
+            detections = detect_vehicles(frame, cam_id)
+            crossing_count, type_counts = check_zebra_crossing(
+                detections, cam_regions, cam_id)
+
+            total_vehicle_count += len(detections)
+            total_crossing_count += crossing_count
+            for k, v in type_counts.items():
+                aggregated_types[k] = aggregated_types.get(k, 0) + v
+
+            annotate_frame(frame, detections, cam_regions, cam_id)
+
+            # Save annotated frame at configured interval
+            now = time.time()
+            if now - last_save_time >= config.image_save_interval:
+                fname = f"{cam_id}_{int(now)}.jpg"
+                fpath = os.path.join(save_dir, fname)
+                cv2.imwrite(fpath, frame)
+                logger.debug("[VISION] %s: saved %s", cam_id, fname)
+                last_save_time = now
+
+            processing_time_sum += time.time() - t0
+
+    except Exception:
+        logger.exception("[VISION] %s: error during processing cycle", cam_id)
+    finally:
+        cap.release()
+
+    # Insert summary detection data into database
+    elapsed = time.time() - cycle_start
+    density = total_vehicle_count / max(elapsed, 0.001)
+    try:
+        database.insert_detection(
+            cam_id=cam_id,
+            vehicle_count=total_vehicle_count,
+            density=round(density, 4),
+            weighted_count=total_vehicle_count,
+            weighted_density=round(density, 4),
+            vdc=total_crossing_count,
+            processing_time=round(processing_time_sum, 4),
+            vehicle_types=aggregated_types,
+        )
+    except Exception:
+        logger.exception("[VISION] %s: failed to insert detection data", cam_id)
+
+    logger.info(
+        "[VISION] %s cycle done: frames=%d vehicles=%d crossings=%d "
+        "elapsed=%.1fs",
+        cam_id, frame_count, total_vehicle_count, total_crossing_count,
+        elapsed,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Main cyclic processing loop
+# ---------------------------------------------------------------------------
+
+
+def cyclic_processing():
+    """Continuously cycle through enabled cameras, processing each in turn."""
+    global regions
+
+    logger.info("[VISION] Cyclic processing started")
+
+    while True:
+        cameras = config.cameras  # dynamic – picks up changes at runtime
+        if not cameras:
+            logger.warning("[VISION] No enabled cameras, sleeping 5s")
+            time.sleep(5)
+            continue
+
+        # Refresh regions each full cycle
+        regions = config.load_regions()
+
+        for cam_id, cam_info in cameras.items():
+            rtsp_url = cam_info.get('rtsp_url', '')
+            if not rtsp_url:
+                logger.warning("[VISION] %s: no RTSP URL configured, skipping",
+                               cam_id)
+                continue
+            try:
+                process_camera_cycle(
+                    cam_id, rtsp_url, duration=config.process_duration)
+            except Exception:
+                logger.exception(
+                    "[VISION] %s: unhandled error, continuing to next camera",
+                    cam_id)

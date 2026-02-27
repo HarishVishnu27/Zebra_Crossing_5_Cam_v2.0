@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zebra Crossing Analytics v2 — Analytics</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0f1117;
+            --bg-card: rgba(23, 25, 35, 0.85);
+            --bg-glass: rgba(30, 33, 48, 0.65);
+            --accent-purple: #7c3aed;
+            --accent-pink: #ec4899;
+            --text-primary: #e2e8f0;
+            --text-muted: #94a3b8;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background: #f3f4f6;
+            color: #1f2937;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        /* Sticky header — dark */
+        .main-header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(15, 17, 23, 0.82);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+            padding: 0.65rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            white-space: nowrap;
+        }
+        .nav-links { display: flex; gap: 1.25rem; align-items: center; }
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover, .nav-links a.active { color: #fff; }
+        .hamburger { display: none; background: none; border: none; color: #fff; font-size: 1.4rem; cursor: pointer; }
+
+        /* Hero banner */
+        .hero-banner {
+            background: linear-gradient(135deg, #1e1b4b, #4c1d95, #7c3aed);
+            color: #fff;
+            padding: 2rem 1.5rem 1.5rem;
+            text-align: center;
+        }
+        .hero-banner h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 0.25rem; }
+        .hero-banner p { font-size: 0.95rem; color: rgba(255,255,255,0.7); margin: 0; }
+
+        /* Filter card */
+        .filter-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 1rem;
+            padding: 1.25rem 1.5rem;
+            margin: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .filter-card label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 0.35rem;
+        }
+        .filter-card select,
+        .filter-card input[type="date"] {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            color: #374151;
+            background: #fff;
+            transition: border-color 0.2s;
+        }
+        .filter-card select:focus,
+        .filter-card input[type="date"]:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            border: none;
+            color: #fff;
+            padding: 0.55rem 1.25rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+        .btn-primary:hover { opacity: 0.85; }
+        .btn-secondary {
+            background: #fff;
+            border: 1px solid #d1d5db;
+            color: #374151;
+            padding: 0.55rem 1.25rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .btn-secondary:hover { background: #f9fafb; }
+
+        /* Summary cards */
+        .summary-section {
+            padding: 0 1.5rem 1.5rem;
+        }
+        .summary-section h2 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin: 0 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .summary-section h2 i { color: var(--accent-purple); }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+        .summary-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 1rem;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            transition: box-shadow 0.2s;
+        }
+        .summary-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .summary-card .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+        .summary-card .card-header h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin: 0;
+            color: #1f2937;
+        }
+        .summary-card .total-count {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent-purple);
+            margin-bottom: 0.75rem;
+        }
+        .badge-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+        .vehicle-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 9999px;
+        }
+        .badge-car       { background: #dbeafe; color: #1e40af; }
+        .badge-truck     { background: #fef3c7; color: #92400e; }
+        .badge-bus       { background: #d1fae5; color: #065f46; }
+        .badge-motorcycle{ background: #fce7f3; color: #9d174d; }
+        .badge-bicycle   { background: #e0e7ff; color: #3730a3; }
+        .badge-other     { background: #f3f4f6; color: #4b5563; }
+
+        /* Loading spinner */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .loading-overlay.active { display: flex; }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top-color: var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Footer */
+        .page-footer {
+            text-align: center;
+            padding: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            margin-top: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none; flex-direction: column;
+                position: absolute; top: 100%; left: 0; right: 0;
+                background: rgba(15,17,23,0.95);
+                padding: 1rem; gap: 0.75rem;
+            }
+            .nav-links.open { display: flex; }
+            .hamburger { display: block; }
+            .filter-card { margin: 1rem; padding: 1rem; }
+            .summary-section { padding: 0 1rem 1rem; }
+            .summary-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<!-- Header -->
+<header class="main-header">
+    <span class="logo-text">Zebra Crossing Analytics v2</span>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Toggle navigation"><i class="fas fa-bars"></i></button>
+    <nav class="nav-links" id="navLinks">
+        <a href="{{ url_for('index') }}"><i class="fas fa-th-large"></i> Home</a>
+        <a href="{{ url_for('admin_panel') }}"><i class="fas fa-cog"></i> Admin Panel</a>
+        <a href="{{ url_for('zebra_crossing_analytics') }}" class="active"><i class="fas fa-chart-bar"></i> Analytics</a>
+        <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    </nav>
+</header>
+
+<!-- Hero banner -->
+<div class="hero-banner">
+    <h1><i class="fas fa-chart-line"></i> Zebra Crossing Analytics</h1>
+    <p>Data insights and trends</p>
+</div>
+
+<!-- Filter section -->
+<div class="filter-card">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <!-- Camera -->
+        <div>
+            <label for="cameraFilter"><i class="fas fa-video"></i> Camera</label>
+            <select id="cameraFilter" onchange="updateCubeVisibility()">
+                <option value="consolidated">Consolidated</option>
+                <option value="all">All Cameras</option>
+                {% for cam_id in camera_ids %}
+                <option value="{{ cam_id }}">{{ cameras[cam_id].name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <!-- Preset -->
+        <div>
+            <label for="presetFilter"><i class="fas fa-calendar-alt"></i> Time Range</label>
+            <select id="presetFilter" onchange="updateCustomDateFields()">
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="last_24h">Last 24 Hours</option>
+                <option value="last_7d">Last 7 Days</option>
+                <option value="last_30d">Last 30 Days</option>
+                <option value="custom">Custom</option>
+            </select>
+        </div>
+        <!-- Custom date range -->
+        <div id="customDateStart" style="display:none;">
+            <label for="startDate"><i class="fas fa-calendar"></i> Start Date</label>
+            <input type="date" id="startDate">
+        </div>
+        <div id="customDateEnd" style="display:none;">
+            <label for="endDate"><i class="fas fa-calendar"></i> End Date</label>
+            <input type="date" id="endDate">
+        </div>
+        <!-- Vehicle type -->
+        <div>
+            <label for="vehicleTypeFilter"><i class="fas fa-car"></i> Vehicle Type</label>
+            <select id="vehicleTypeFilter">
+                <option value="">All</option>
+                <option value="car">Cars</option>
+                <option value="truck">Trucks</option>
+                <option value="bus">Buses</option>
+                <option value="motorcycle">Motorcycles</option>
+                <option value="bicycle">Bicycles</option>
+            </select>
+        </div>
+    </div>
+    <div class="flex flex-wrap gap-3">
+        <button class="btn-primary" id="applyFiltersBtn" onclick="loadAnalyticsData()">
+            <i class="fas fa-filter"></i> Apply Filters
+        </button>
+        <button class="btn-secondary" id="exportBtn" onclick="exportData()">
+            <i class="fas fa-download"></i> Export Data
+        </button>
+    </div>
+</div>
+
+<!-- Summary cards -->
+<div class="summary-section">
+    <h2><i class="fas fa-th-large"></i> Summary</h2>
+    <div class="summary-grid" id="summaryGrid">
+        <!-- Consolidated card -->
+        <div class="summary-card" id="cube-consolidated" style="display:none;">
+            <div class="card-header">
+                <h3><i class="fas fa-layer-group"></i> Consolidated</h3>
+            </div>
+            <div class="total-count" id="total-consolidated">0</div>
+            <div class="badge-row" id="badges-consolidated"></div>
+        </div>
+        <!-- Per-camera cards -->
+        {% for cam_id in camera_ids %}
+        <div class="summary-card" id="cube-{{ cam_id }}" style="display:none;">
+            <div class="card-header">
+                <h3><i class="fas fa-video"></i> {{ cameras[cam_id].name }}</h3>
+            </div>
+            <div class="total-count" id="total-{{ cam_id }}">0</div>
+            <div class="badge-row" id="badges-{{ cam_id }}"></div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Footer -->
+<div class="page-footer">
+    <button class="btn-primary" onclick="loadAnalyticsData()">
+        <i class="fas fa-sync-alt"></i> Refresh Data
+    </button>
+</div>
+
+<script>
+    const cameraIds = {{ camera_ids | tojson }};
+
+    /* ---- Mobile menu toggle ---- */
+    document.getElementById('hamburgerBtn').addEventListener('click', function() {
+        document.getElementById('navLinks').classList.toggle('open');
+    });
+
+    /* ---- Show/hide custom date fields ---- */
+    function updateCustomDateFields() {
+        const preset = document.getElementById('presetFilter').value;
+        const show = preset === 'custom';
+        document.getElementById('customDateStart').style.display = show ? '' : 'none';
+        document.getElementById('customDateEnd').style.display = show ? '' : 'none';
+    }
+
+    /* ---- Show/hide summary cards based on camera selection ---- */
+    function updateCubeVisibility() {
+        const sel = document.getElementById('cameraFilter').value;
+        // Hide all cubes first
+        document.getElementById('cube-consolidated').style.display = 'none';
+        cameraIds.forEach(function(id) {
+            document.getElementById('cube-' + id).style.display = 'none';
+        });
+        // Show relevant cubes
+        if (sel === 'consolidated') {
+            document.getElementById('cube-consolidated').style.display = '';
+        } else if (sel === 'all') {
+            cameraIds.forEach(function(id) {
+                document.getElementById('cube-' + id).style.display = '';
+            });
+        } else {
+            var el = document.getElementById('cube-' + sel);
+            if (el) el.style.display = '';
+        }
+    }
+
+    /* ---- Build query string from current filters ---- */
+    function buildParams(camOverride) {
+        const params = new URLSearchParams();
+        const camVal = camOverride || document.getElementById('cameraFilter').value;
+        if (camVal && camVal !== 'all') params.set('cam_id', camVal);
+        const preset = document.getElementById('presetFilter').value;
+        params.set('preset', preset);
+        if (preset === 'custom') {
+            const s = document.getElementById('startDate').value;
+            const e = document.getElementById('endDate').value;
+            if (s) params.set('start_date', s);
+            if (e) params.set('end_date', e);
+        }
+        const vt = document.getElementById('vehicleTypeFilter').value;
+        if (vt) params.set('vehicle_type', vt);
+        return params;
+    }
+
+    /* ---- Badge helpers ---- */
+    const badgeClasses = {
+        car: 'badge-car', truck: 'badge-truck', bus: 'badge-bus',
+        motorcycle: 'badge-motorcycle', bicycle: 'badge-bicycle'
+    };
+    const badgeIcons = {
+        car: 'fa-car', truck: 'fa-truck', bus: 'fa-bus',
+        motorcycle: 'fa-motorcycle', bicycle: 'fa-bicycle'
+    };
+
+    function renderBadges(container, breakdown) {
+        container.innerHTML = '';
+        if (!breakdown || typeof breakdown !== 'object') return;
+        Object.keys(breakdown).forEach(function(type) {
+            var count = breakdown[type];
+            if (!count) return;
+            var cls = badgeClasses[type] || 'badge-other';
+            var icon = badgeIcons[type] || 'fa-car-side';
+            var span = document.createElement('span');
+            span.className = 'vehicle-badge ' + cls;
+            span.innerHTML = '<i class="fas ' + icon + '"></i> ' +
+                type.charAt(0).toUpperCase() + type.slice(1) + ': ' + count;
+            container.appendChild(span);
+        });
+    }
+
+    /* ---- Populate a per-camera card ---- */
+    function populateCube(cam, stats) {
+        var totalEl = document.getElementById('total-' + cam);
+        var badgesEl = document.getElementById('badges-' + cam);
+        if (!totalEl || !badgesEl) return;
+        totalEl.textContent = (stats && stats.total != null) ? stats.total : 0;
+        renderBadges(badgesEl, stats ? stats.breakdown : {});
+    }
+
+    /* ---- Populate consolidated card ---- */
+    function populateConsolidatedCube(stats) {
+        var totalEl = document.getElementById('total-consolidated');
+        var badgesEl = document.getElementById('badges-consolidated');
+        totalEl.textContent = (stats && stats.total != null) ? stats.total : 0;
+        renderBadges(badgesEl, stats ? stats.breakdown : {});
+    }
+
+    /* ---- Main data loader ---- */
+    function loadAnalyticsData() {
+        var sel = document.getElementById('cameraFilter').value;
+        updateCubeVisibility();
+        document.getElementById('loadingOverlay').classList.add('active');
+
+        if (sel === 'consolidated') {
+            var params = buildParams('consolidated');
+            fetch('/api/analytics_data?' + params.toString())
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    populateConsolidatedCube(data.stats);
+                })
+                .catch(function(err) { console.error('Analytics fetch error:', err); })
+                .finally(function() {
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                });
+        } else if (sel === 'all') {
+            var promises = cameraIds.map(function(id) {
+                var p = buildParams(id);
+                return fetch('/api/analytics_data?' + p.toString())
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) { populateCube(id, data.stats); });
+            });
+            Promise.all(promises)
+                .catch(function(err) { console.error('Analytics fetch error:', err); })
+                .finally(function() {
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                });
+        } else {
+            var params = buildParams(sel);
+            fetch('/api/analytics_data?' + params.toString())
+                .then(function(r) { return r.json(); })
+                .then(function(data) { populateCube(sel, data.stats); })
+                .catch(function(err) { console.error('Analytics fetch error:', err); })
+                .finally(function() {
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                });
+        }
+    }
+
+    /* ---- Export ---- */
+    function exportData() {
+        var params = buildParams();
+        window.location.href = '/download_zebra_data?' + params.toString();
+    }
+
+    /* ---- Initial load ---- */
+    document.addEventListener('DOMContentLoaded', function() {
+        updateCustomDateFields();
+        loadAnalyticsData();
+    });
+</script>
+</body>
+</html>

@@ -1,40 +1,6 @@
-# Python bytecode
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-venv/
-env/
-ENV/
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-
-# Model files
-models/
-*.pt
-*.pth
-
-# Log files
-*.log
-
-# Temporary files
-static/temp/
-static/processed/
-
-# Config files with sensitive data
-sahi_config.json
-sahi_state.json
+flask>=2.3.0
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+ultralytics>=8.0.0
+torch>=2.0.0
+torchvision>=0.15.0
